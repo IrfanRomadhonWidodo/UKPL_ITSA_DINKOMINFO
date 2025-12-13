@@ -6,6 +6,7 @@ use Laravel\Dusk\Browser;
 use Tests\DuskTestCase;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 
 class AdminUserTest extends DuskTestCase
 {
@@ -34,6 +35,9 @@ class AdminUserTest extends DuskTestCase
     public function test_admin_can_create_new_user(): void
     {
         $admin = User::where('role', 'admin')->first();
+        
+        // Clean up any existing user from failed tests
+        User::where('email', 'newtestuser@example.com')->forceDelete();
 
         $this->browse(function (Browser $browser) use ($admin) {
             $browser->loginAs($admin)
@@ -96,9 +100,9 @@ class AdminUserTest extends DuskTestCase
     public function test_admin_can_view_user_details(): void
     {
         $admin = User::where('role', 'admin')->first();
+        // Remove hardcoded email to prevent unique constraint violation
         $user = User::factory()->create([
-            'name' => 'User Detail View',
-            'email' => 'detailview@example.com'
+            'name' => 'User Detail View'
         ]);
 
         $this->browse(function (Browser $browser) use ($admin, $user) {

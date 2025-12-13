@@ -2,204 +2,182 @@
 
 namespace Tests\Browser;
 
+use App\Models\Formulir;
+use App\Models\User;
 use Laravel\Dusk\Browser;
 use Tests\DuskTestCase;
-use App\Models\User;
-use App\Models\Formulir;
 
 class AdminFormulirTest extends DuskTestCase
 {
-    /**
-     * Test admin can view formulir list.
-     */
     public function test_admin_can_view_formulir_list(): void
     {
-        $admin = User::where('role', 'admin')->first();
+        $admin = User::firstWhere('role', 'admin')
+            ?? User::factory()->create(['role' => 'admin']);
 
         $this->browse(function (Browser $browser) use ($admin) {
-            $browser->logout()
-                ->loginAs($admin)
+            $browser->loginAs($admin)
                 ->visit('/admin/formulir')
                 ->assertPathIs('/admin/formulir')
                 ->assertSee('Manajemen Formulir');
         });
     }
 
-    /**
-     * Test formulir list shows data table.
-     */
-    public function test_formulir_list_shows_data_table(): void
+    public function test_formulir_list_shows_data(): void
     {
-        $admin = User::where('role', 'admin')->first();
+        $admin = User::firstWhere('role', 'admin');
 
-        $this->browse(function (Browser $browser) use ($admin) {
-            $browser->logout()
-                ->loginAs($admin)
-                ->visit('/admin/formulir')
-                ->waitFor('table', 10)
-                ->assertVisible('table')
-                ->assertSee('Nama Aplikasi')
-                ->assertSee('Status');
-        });
-    }
-
-    /**
-     * Test admin can view formulir_detail.
-     */
-    public function test_admin_can_view_formulir_detail(): void
-    {
-        $admin = User::where('role', 'admin')->first();
-        $formulir = Formulir::first();
-
-        if (!$formulir) {
-            $this->markTestSkipped('No formulir data available');
-        }
-
-        $this->browse(function (Browser $browser) use ($admin, $formulir) {
-            $browser->logout()
-                ->loginAs($admin)
-                ->visit('/admin/formulir')
-                ->click("button[onclick*=\"viewFormulirModal{$formulir->id}\"], a[href*=\"formulir/{$formulir->id}\"]")
-                ->waitFor('#viewFormulirModal' . $formulir->id . ', .modal', 5)
-                ->assertSee($formulir->nama_aplikasi);
-        });
-    }
-
-    /**
-     * Test admin can update formulir status.
-     */
-    public function test_admin_can_update_formulir_status(): void
-    {
-        $admin = User::where('role', 'admin')->first();
-
-        // Create specific formulir for update test
-        $formulir = Formulir::factory()->create([
-            'user_id' => $admin->id, // Use admin or any user
-            'status' => 'diproses',
-            'nama_aplikasi' => 'App Update Status Test'
-        ]);
-
-        $this->browse(function (Browser $browser) use ($admin, $formulir) {
-            $browser->logout()
-                ->loginAs($admin)
-                ->visit('/admin/formulir')
-                ->click("button[onclick*=\"editFormulirModal{$formulir->id}\"]")
-                ->waitFor('#editFormulirModal' . $formulir->id . ', .modal', 5)
-                ->whenAvailable('.modal, [id*="FormulirModal' . $formulir->id . '"]', function ($modal) {
-                    $modal->select('select[name="status"]', 'disetujui')
-                        ->press('Simpan');
-                })
-                ->waitForText('berhasil', 10)
-                ->assertSee('berhasil');
-        });
-
-        $this->assertDatabaseHas('formulir', [
-            'id' => $formulir->id,
-            'status' => 'disetujui',
-        ]);
-
-        $formulir->delete(); // Cleanup
-    }
-
-    /**
-     * Test admin can add balasan to formulir.
-     */
-    public function test_admin_can_add_balasan_to_formulir(): void
-    {
-        $admin = User::where('role', 'admin')->first();
-
-        // Create specific formulir
         $formulir = Formulir::factory()->create([
             'user_id' => $admin->id,
-            'status' => 'diproses',
-            'nama_aplikasi' => 'App Balasan Test'
+            'ip_jenis' => 'public',
+            'nama_aplikasi' => 'Formulir Test View',
         ]);
 
         $this->browse(function (Browser $browser) use ($admin, $formulir) {
-            $browser->logout()
-                ->loginAs($admin)
+            $browser->loginAs($admin)
                 ->visit('/admin/formulir')
-                ->click("button[onclick*=\"editFormulirModal{$formulir->id}\"]")
-                ->waitFor('#editFormulirModal' . $formulir->id . ', .modal', 5)
-                ->whenAvailable('.modal, [id*="FormulirModal' . $formulir->id . '"]', function ($modal) {
-                    $modal->type('textarea[name="balasan_admin"]', 'Formulir Anda sedang dalam proses verifikasi. Mohon tunggu.')
-                        ->press('Simpan');
+                ->waitForText('Formulir Test View')
+                ->assertSee('Formulir Test View');
+        });
+    }
+
+    public function test_admin_can_view_formulir_detail(): void
+    {
+        $admin = User::firstWhere('role', 'admin');
+
+        $formulir = Formulir::factory()->create([
+            'user_id' => $admin->id,
+            'ip_jenis' => 'public',
+            'nama_aplikasi' => 'Detail Formulir Test',
+        ]);
+
+        $this->browse(function (Browser $browser) use ($admin, $formulir) {
+            $browser->loginAs($admin)
+                ->visit('/admin/formulir')
+                ->waitForText('Detail Formulir Test')
+                ->click("button[onclick=\"openModal('viewFormulirModal{$formulir->id}')\"]")
+                ->waitFor("#viewFormulirModal{$formulir->id}", 5)
+                ->with("#viewFormulirModal{$formulir->id}", function ($modal) use ($formulir) {
+                    $modal->assertSee('Detail Formulir')
+                          ->assertSee($formulir->nama_aplikasi);
+                });
+        });
+    }
+
+    public function test_admin_can_update_formulir_status(): void
+    {
+        $admin = User::firstWhere('role', 'admin');
+
+        $formulir = Formulir::factory()->create([
+            'user_id' => $admin->id,
+            'ip_jenis' => 'public',
+            'status' => 'diproses',
+        ]);
+
+        $this->browse(function (Browser $browser) use ($admin, $formulir) {
+            $browser->loginAs($admin)
+                ->visit('/admin/formulir')
+                ->waitForText($formulir->nama_aplikasi)
+                ->click("button[onclick=\"openModal('replyFormulirModal{$formulir->id}')\"]")
+                ->waitFor("#replyFormulirModal{$formulir->id}", 5)
+                ->with("#replyFormulirModal{$formulir->id}", function ($modal) {
+                    $modal->type('balasan_admin', 'Balasan dari admin')
+                          ->press('Kirim Balasan');
                 })
-                ->waitForText('berhasil', 10);
+                ->waitForLocation('/admin/formulir');
         });
 
         $this->assertDatabaseHas('formulir', [
             'id' => $formulir->id,
-            'balasan_admin' => 'Formulir Anda sedang dalam proses verifikasi. Mohon tunggu.',
+            'status' => 'revisi',
         ]);
-
-        $formulir->delete(); // Cleanup
     }
 
     /**
-     * Test admin can search formulir.
+     * 🔍 Test admin can search formulir
      */
     public function test_admin_can_search_formulir(): void
     {
-        $admin = User::where('role', 'admin')->first();
-        $formulir = Formulir::first();
+        $admin = User::firstWhere('role', 'admin');
 
-        if (!$formulir) {
-            $this->markTestSkipped('No formulir available for search');
-        }
+        Formulir::factory()->create([
+            'user_id' => $admin->id,
+            'ip_jenis' => 'public',
+            'nama_aplikasi' => 'UniqueSearchFormulir',
+            'status' => 'diproses',
+        ]);
 
-        $this->browse(function (Browser $browser) use ($admin, $formulir) {
-            $browser->logout()
-                ->loginAs($admin)
+        Formulir::factory()->create([
+            'user_id' => $admin->id,
+            'ip_jenis' => 'public',
+            'nama_aplikasi' => 'OtherFormulir',
+            'status' => 'diproses',
+        ]);
+
+        $this->browse(function (Browser $browser) use ($admin) {
+            $browser->loginAs($admin)
                 ->visit('/admin/formulir')
-                ->waitFor('input[name="search"]', 5)
-                ->type('input[name="search"]', $formulir->nama_aplikasi)
+                ->type('search', 'UniqueSearchFormulir')
                 ->press('Cari')
-                ->pause(1000)
-                ->assertSee($formulir->nama_aplikasi);
+                ->waitForText('UniqueSearchFormulir')
+                ->assertSee('UniqueSearchFormulir')
+                ->assertDontSee('OtherFormulir');
         });
     }
 
     /**
-     * Test admin can filter formulir by status.
+     * 🔽 Test admin can filter formulir by status
      */
     public function test_admin_can_filter_formulir_by_status(): void
     {
-        $admin = User::where('role', 'admin')->first();
+        $admin = User::firstWhere('role', 'admin');
+
+        Formulir::factory()->create([
+            'user_id' => $admin->id,
+            'ip_jenis' => 'public',
+            'nama_aplikasi' => 'Formulir Diproses',
+            'status' => 'diproses',
+        ]);
+
+        Formulir::factory()->create([
+            'user_id' => $admin->id,
+            'ip_jenis' => 'public',
+            'nama_aplikasi' => 'Formulir Selesai',
+            'status' => 'selesai',
+        ]);
 
         $this->browse(function (Browser $browser) use ($admin) {
-            $browser->logout()
-                ->loginAs($admin)
+            $browser->loginAs($admin)
                 ->visit('/admin/formulir')
-                ->waitFor('select[name="status"]', 5)
-                ->select('select[name="status"]', 'diproses')
+                ->select('status', 'diproses')
                 ->press('Cari')
-                ->pause(1000)
-                ->assertQueryStringHas('status', 'diproses');
+                ->waitForText('Formulir Diproses')
+                ->assertSee('Formulir Diproses')
+                ->assertDontSee('Formulir Selesai');
         });
     }
 
-    /**
-     * Test admin can delete formulir.
-     */
     public function test_admin_can_delete_formulir(): void
     {
-        $admin = User::where('role', 'admin')->first();
+        $admin = User::firstWhere('role', 'admin');
 
-        // Create dummy formulir to delete
         $formulir = Formulir::factory()->create([
             'user_id' => $admin->id,
-            'nama_aplikasi' => 'To Be Deleted'
+            'ip_jenis' => 'public',
+            'nama_aplikasi' => 'Formulir Delete Test',
         ]);
-        $formulirId = $formulir->id;
 
-        $this->browse(function (Browser $browser) use ($admin, $formulirId) {
-            $browser->logout()
-                ->loginAs($admin)
+        $this->browse(function (Browser $browser) use ($admin, $formulir) {
+            $browser->loginAs($admin)
                 ->visit('/admin/formulir')
-                ->script("document.getElementById('delete-form-{$formulirId}').submit();");
+                ->waitForText('Formulir Delete Test')
+                ->click("button[onclick=\"deleteFormulir({$formulir->id})\"]")
+                ->waitFor('.swal2-container', 5)
+                ->click('.swal2-confirm')
+                ->waitUntilMissing('#delete-form-' . $formulir->id);
         });
 
-        $this->assertDatabaseMissing('formulir', ['id' => $formulirId]);
+        $this->assertDatabaseMissing('formulir', [
+            'id' => $formulir->id,
+        ]);
     }
 }
