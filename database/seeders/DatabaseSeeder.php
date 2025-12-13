@@ -76,11 +76,13 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
-    // Panggil seeder lain jika ada
-    $this->call([
-        FormulirSeeder::class,
-        FeedbackSeeder::class, // tambahkan ini
-    ]);
+        // Panggil seeder lain jika ada
+        $this->call([
+            FormulirSeeder::class,
+            FeedbackSeeder::class,
+            // HasilSeeder::class, // Disabled - causes unique constraint error
+            // NotifikasiSeeder::class, // Disabled - depends on data
+        ]);
 
     }
 }
