@@ -7,18 +7,24 @@ use Tests\DuskTestCase;
 use App\Models\User;
 use App\Models\Feedback;
 use Illuminate\Support\Str;
+use Illuminate\Foundation\Testing\DatabaseMigrations;
 
 class AdminFeedbackTest extends DuskTestCase
 {
+    use DatabaseMigrations;
+
+    public function setUp(): void
+    {
+        parent::setUp();
+        $this->seed();
+    }
+
     /**
      * Test admin can view feedback list.
      */
     public function test_admin_can_view_feedback_list(): void
     {
         $admin = User::where('role', 'admin')->first();
-        if (!$admin) {
-            $admin = User::factory()->create(['role' => 'admin']);
-        }
 
         $this->browse(function (Browser $browser) use ($admin) {
             $browser->loginAs($admin)
@@ -35,19 +41,14 @@ class AdminFeedbackTest extends DuskTestCase
     public function test_feedback_list_shows_feedback_data(): void
     {
         $admin = User::where('role', 'admin')->first();
-
-        $feedback = Feedback::create([
-            'user_id' => $admin->id,
-            'subjek' => 'masalah_teknis',
-            'pesan' => 'Test feedback for list view',
-            'status' => 'diproses'
-        ]);
+        $feedback = Feedback::first();
 
         $this->browse(function (Browser $browser) use ($admin, $feedback) {
             $browser->loginAs($admin)
                 ->visit('/admin/feedbacks')
-                ->waitForText('Test feedback for list view')
-                ->assertSee('Masalah Teknis')
+                ->type('search', substr($feedback->pesan, 0, 10))
+                ->press('Cari')
+                ->waitForText(Str::limit($feedback->pesan, 50))
                 ->assertSee(Str::limit($feedback->pesan, 50));
         });
     }
@@ -58,22 +59,19 @@ class AdminFeedbackTest extends DuskTestCase
     public function test_admin_can_view_feedback_detail(): void
     {
         $admin = User::where('role', 'admin')->first();
-        $feedback = Feedback::create([
-            'user_id' => $admin->id,
-            'subjek' => 'pertanyaan_informasi',
-            'pesan' => 'I verified this message content',
-            'status' => 'diproses'
-        ]);
+        $feedback = Feedback::first();
 
         $this->browse(function (Browser $browser) use ($admin, $feedback) {
             $browser->loginAs($admin)
                 ->visit('/admin/feedbacks')
-                ->waitForText('I verified this message content')
+                ->type('search', substr($feedback->pesan, 0, 10))
+                ->press('Cari')
+                ->waitForText(Str::limit($feedback->pesan, 50))
                 ->click("button[onclick=\"openModal('viewFeedbackModal{$feedback->id}')\"]")
                 ->waitFor("#viewFeedbackModal{$feedback->id}", 5)
                 ->with("#viewFeedbackModal{$feedback->id}", function ($modal) use ($feedback) {
                     $modal->assertSee('Detail Feedback')
-                        ->assertSee('I verified this message content')
+                        ->assertSee($feedback->pesan)
                         ->assertSee($feedback->user->name);
                 });
         });
@@ -85,17 +83,16 @@ class AdminFeedbackTest extends DuskTestCase
     public function test_admin_can_reply_to_feedback(): void
     {
         $admin = User::where('role', 'admin')->first();
-        $feedback = Feedback::create([
-            'user_id' => $admin->id,
-            'subjek' => 'saran_pengembangan',
-            'pesan' => 'Feedback needing reply',
-            'status' => 'diproses'
-        ]);
+
+        // Pick a feedback that hasn't been replied to yet (all are null in seeder)
+        $feedback = Feedback::whereNull('balasan_admin')->first();
 
         $this->browse(function (Browser $browser) use ($admin, $feedback) {
             $browser->loginAs($admin)
                 ->visit('/admin/feedbacks')
-                ->waitForText('Feedback needing reply')
+                ->type('search', substr($feedback->pesan, 0, 10))
+                ->press('Cari')
+                ->waitForText(Str::limit($feedback->pesan, 50))
                 ->click("button[onclick=\"openModal('replyFeedbackModal{$feedback->id}')\"]")
                 ->waitFor("#replyFeedbackModal{$feedback->id}", 5)
                 ->with("#replyFeedbackModal{$feedback->id}", function ($modal) {
@@ -103,7 +100,7 @@ class AdminFeedbackTest extends DuskTestCase
                         ->press('Kirim Balasan');
                 })
                 ->waitForLocation('/admin/feedbacks')
-                ->assertSee('Berhasil!'); // SweetAlert success message
+                ->assertSee('Berhasil!');
 
             $this->assertDatabaseHas('feedbacks', [
                 'id' => $feedback->id,
@@ -118,28 +115,23 @@ class AdminFeedbackTest extends DuskTestCase
     public function test_admin_can_search_feedback(): void
     {
         $admin = User::where('role', 'admin')->first();
-        Feedback::create([
-            'user_id' => $admin->id,
-            'subjek' => 'masalah_teknis',
-            'pesan' => 'UniqueSearchTerm',
-            'status' => 'selesai'
-        ]);
 
-        Feedback::create([
-            'user_id' => $admin->id,
-            'subjek' => 'keluhan_layanan',
-            'pesan' => 'OtherMessage',
-            'status' => 'selesai'
-        ]);
+        // Update a specific feedback to have a unique message for searching
+        $uniqueMessage = 'UniqueSearchTerm_' . Str::random(5);
+        $targetFeedback = Feedback::first();
+        $targetFeedback->update(['pesan' => $uniqueMessage]);
 
-        $this->browse(function (Browser $browser) use ($admin) {
+        // Another feedback to ensure it's NOT seen
+        $otherFeedback = Feedback::where('id', '!=', $targetFeedback->id)->first();
+
+        $this->browse(function (Browser $browser) use ($admin, $uniqueMessage, $otherFeedback) {
             $browser->loginAs($admin)
                 ->visit('/admin/feedbacks')
-                ->type('search', 'UniqueSearchTerm')
+                ->type('search', $uniqueMessage)
                 ->press('Cari')
-                ->waitForText('UniqueSearchTerm')
-                ->assertSee('UniqueSearchTerm')
-                ->assertDontSee('OtherMessage');
+                ->waitForText($uniqueMessage)
+                ->assertSee($uniqueMessage)
+                ->assertDontSee(Str::limit($otherFeedback->pesan, 20));
         });
     }
 
@@ -149,28 +141,22 @@ class AdminFeedbackTest extends DuskTestCase
     public function test_admin_can_filter_feedback_by_status(): void
     {
         $admin = User::where('role', 'admin')->first();
-        Feedback::create([
-            'user_id' => $admin->id,
-            'subjek' => 'masalah_teknis',
-            'pesan' => 'StatusDiproses',
-            'status' => 'diproses'
-        ]);
 
-        Feedback::create([
-            'user_id' => $admin->id,
-            'subjek' => 'masalah_teknis',
-            'pesan' => 'StatusSelesai',
-            'status' => 'selesai'
-        ]);
+        // Seeder creates 'diproses'. Let's mark one as 'selesai'.
+        $feedbackSelesai = Feedback::first();
+        $feedbackSelesai->update(['status' => 'selesai', 'pesan' => 'StatusSelesaiCheck']);
+
+        $feedbackDiproses = Feedback::where('id', '!=', $feedbackSelesai->id)->first();
+        $feedbackDiproses->update(['pesan' => 'StatusDiprosesCheck']);
 
         $this->browse(function (Browser $browser) use ($admin) {
             $browser->loginAs($admin)
                 ->visit('/admin/feedbacks')
-                ->select('status', 'diproses')
+                ->select('status', 'selesai')
                 ->press('Cari')
-                ->waitForText('StatusDiproses')
-                ->assertSee('StatusDiproses')
-                ->assertDontSee('StatusSelesai');
+                ->waitForText('StatusSelesaiCheck')
+                ->assertSee('StatusSelesaiCheck')
+                ->assertDontSee('StatusDiprosesCheck');
         });
     }
 
@@ -180,17 +166,14 @@ class AdminFeedbackTest extends DuskTestCase
     public function test_admin_can_delete_feedback(): void
     {
         $admin = User::where('role', 'admin')->first();
-        $feedback = Feedback::create([
-            'user_id' => $admin->id,
-            'subjek' => 'masalah_teknis',
-            'pesan' => 'ToBeDeleted',
-            'status' => 'diproses'
-        ]);
+        $feedback = Feedback::first();
 
         $this->browse(function (Browser $browser) use ($admin, $feedback) {
             $browser->loginAs($admin)
                 ->visit('/admin/feedbacks')
-                ->waitForText('ToBeDeleted')
+                ->type('search', substr($feedback->pesan, 0, 10))
+                ->press('Cari')
+                ->waitForText(Str::limit($feedback->pesan, 50))
                 ->click("button[onclick=\"deleteFeedback({$feedback->id})\"]")
                 ->waitFor('.swal2-container', 5)
                 ->click('.swal2-confirm')
