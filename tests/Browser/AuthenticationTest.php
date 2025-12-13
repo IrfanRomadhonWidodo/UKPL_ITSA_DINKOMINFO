@@ -132,7 +132,7 @@ class AuthenticationTest extends DuskTestCase
         $this->browse(function (Browser $browser) {
             $browser->logout() // Clear any existing session
                 ->visit('/forgot-password')
-                ->assertSee('Lupa Kata Sandi')
+                ->assertSee('Reset Password')
                 ->assertVisible('input[name="email"]');
         });
     }
