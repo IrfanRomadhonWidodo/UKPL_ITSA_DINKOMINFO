@@ -10,6 +10,13 @@ use Illuminate\Foundation\Testing\DatabaseMigrations;
 
 class FormulirTest extends DuskTestCase
 {
+    use DatabaseMigrations;
+
+    public function setUp(): void
+    {
+        parent::setUp();
+        $this->seed();
+    }
     /**
      * Test user can access formulir page.
      */
