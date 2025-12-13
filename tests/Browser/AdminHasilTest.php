@@ -57,7 +57,7 @@ class AdminHasilTest extends DuskTestCase
     public function test_admin_can_create_hasil(): void
     {
         $admin = User::where('email', 'irfanromadhonwidodo86@gmail.com')->first();
-        
+
         // Use the specific formulir created in FormulirSeeder for this test
         $formulir = Formulir::where('nama_aplikasi', 'Aplikasi Siap Hasil')->firstOrFail();
 
@@ -88,22 +88,22 @@ class AdminHasilTest extends DuskTestCase
     {
         $admin = User::where('email', 'irfanromadhonwidodo86@gmail.com')->first();
 
-        // Get a specific seeded hasil (e.g., SIMPEG)
-        $hasil = Hasil::whereHas('formulir', function($q) {
+        $hasil = Hasil::whereHas('formulir', function ($q) {
             $q->where('nama_aplikasi', 'SIMPEG');
         })->firstOrFail();
 
         $this->browse(function (Browser $browser) use ($admin, $hasil) {
-            $browser->logout()
-                ->loginAs($admin)
+            $browser->loginAs($admin)
                 ->visit('/admin/hasil')
-                
-                // Search to isolate and ensure visibility
-                ->type('input[name="search"]', 'SIMPEG') 
+
+                // isolate row
+                ->type('search', 'SIMPEG')
                 ->press('Cari')
                 ->waitForText('SIMPEG', 5)
-                
-                ->click("button[onclick*=\"viewHasilModal{$hasil->id}\"]")
+
+                // ✅ modal exists in DOM (meski hidden)
+                // Click using the new ID
+                ->click('#btn-view-' . $hasil->id)
                 ->waitFor('#viewHasilModal' . $hasil->id . ', .modal', 5)
                 ->assertSee($hasil->deskripsi);
         });
@@ -117,7 +117,7 @@ class AdminHasilTest extends DuskTestCase
         $admin = User::where('email', 'irfanromadhonwidodo86@gmail.com')->first();
 
         // Use another seeded hasil (e.g., E-OFFICE)
-        $hasil = Hasil::whereHas('formulir', function($q) {
+        $hasil = Hasil::whereHas('formulir', function ($q) {
             $q->where('nama_aplikasi', 'E-OFFICE');
         })->firstOrFail();
 
@@ -126,14 +126,15 @@ class AdminHasilTest extends DuskTestCase
         $this->browse(function (Browser $browser) use ($admin, $hasil, $newDeskripsi) {
             $browser->loginAs($admin)
                 ->visit('/admin/hasil')
-                 // Search to isolate
+                // Search to isolate
                 ->type('input[name="search"]', 'E-OFFICE')
                 ->press('Cari')
                 ->waitForText('E-OFFICE', 5)
+                ->waitFor('#btn-edit-' . $hasil->id, 5)
 
-                ->click("button[onclick*=\"editHasilModal{$hasil->id}\"]")
+                ->click('#btn-edit-' . $hasil->id)
                 ->waitFor('#editHasilModal' . $hasil->id . ', .modal', 5)
-                ->whenAvailable('.modal, [id*="HasilModal' . $hasil->id . '"]', function ($modal) use ($newDeskripsi) {
+                ->whenAvailable('#editHasilModal' . $hasil->id, function ($modal) use ($newDeskripsi) {
                     $modal->clear('textarea[name="deskripsi"]')
                         ->type('textarea[name="deskripsi"]', $newDeskripsi)
                         ->press('Simpan Perubahan');
@@ -156,7 +157,7 @@ class AdminHasilTest extends DuskTestCase
         $admin = User::where('email', 'irfanromadhonwidodo86@gmail.com')->first();
 
         // Use LPSE for deletion
-        $hasil = Hasil::whereHas('formulir', function($q) {
+        $hasil = Hasil::whereHas('formulir', function ($q) {
             $q->where('nama_aplikasi', 'LPSE');
         })->firstOrFail();
 
@@ -166,11 +167,11 @@ class AdminHasilTest extends DuskTestCase
             $browser->logout()
                 ->loginAs($admin)
                 ->visit('/admin/hasil')
-                 // Search to isolate
+                // Search to isolate
                 ->type('input[name="search"]', 'LPSE')
                 ->press('Cari')
                 ->waitForText('LPSE', 5)
-                
+
                 ->script("document.getElementById('delete-form-{$hasilId}').submit();");
         });
 
