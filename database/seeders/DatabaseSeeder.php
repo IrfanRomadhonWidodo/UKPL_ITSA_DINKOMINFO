@@ -80,7 +80,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             FormulirSeeder::class,
             FeedbackSeeder::class,
-            // HasilSeeder::class, // Disabled - causes unique constraint error
+            HasilSeeder::class,
             // NotifikasiSeeder::class, // Disabled - depends on data
         ]);
 

@@ -42,8 +42,8 @@ class HasilSeeder extends Seeder
         ];
 
         foreach ($formulirs as $index => $formulir) {
-            // Skip jika sudah ada hasil untuk formulir ini
-            if (Hasil::where('formulir_id', $formulir->id)->exists()) {
+            // Skip jika sudah ada hasil untuk formulir ini atau jika ini adalah formulir untuk testing create
+            if (Hasil::where('formulir_id', $formulir->id)->exists() || $formulir->nama_aplikasi === 'Aplikasi Siap Hasil') {
                 continue;
             }
 
@@ -56,8 +56,8 @@ class HasilSeeder extends Seeder
                 'tautan' => $data['tautan'],
             ]);
 
-            // Update status formulir menjadi disetujui
-            $formulir->update(['status' => 'disetujui']);
+            // Update status formulir menjadi selesai
+            $formulir->update(['status' => 'selesai']);
         }
 
         $this->command->info('Seeder Hasil ITSA berhasil dijalankan.');

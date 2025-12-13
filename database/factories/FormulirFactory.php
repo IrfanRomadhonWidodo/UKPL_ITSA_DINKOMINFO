@@ -21,7 +21,7 @@ class FormulirFactory extends Factory
             'user_id' => User::factory(),
             'nama_aplikasi' => fake()->company(),
             'domain_aplikasi' => fake()->domainName(),
-            'ip_jenis' => fake()->randomElement(['public', 'private']),
+            'ip_jenis' => fake()->randomElement(['public', 'lokal']),
             'ip_address' => fake()->ipv4(),
             'pejabat_nama' => fake()->name(),
             'pejabat_nip' => fake()->numerify('##################'),

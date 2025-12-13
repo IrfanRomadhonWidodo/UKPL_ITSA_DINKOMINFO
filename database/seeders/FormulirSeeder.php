@@ -62,5 +62,33 @@ class FormulirSeeder extends Seeder
                 'file_hasil_itsa' => null,
             ]);
         }
+
+        // Formulir khusus untuk testing Create Hasil (Status Selesai, Belum ada Hasil)
+        Formulir::create([
+            'user_id' => $adminIrfan->id,
+            'nama_aplikasi' => 'Aplikasi Siap Hasil',
+            'domain_aplikasi' => 'siap.banyumaskab.go.id',
+            'ip_jenis' => 'lokal',
+            'ip_address' => '192.168.1.100',
+            'pejabat_nama' => 'Irfan Romadhon Widodo',
+            'pejabat_nip' => '197001011990031001',
+            'pejabat_pangkat' => 'Pembina',
+            'pejabat_jabatan' => 'Kepala Dinas',
+            'tujuan_sistem' => 'Testing create hasil',
+            'pengguna_sistem' => 'Internal',
+            'hosting' => 'Server lokal',
+            'framework' => 'Laravel',
+            'pengelola_sistem' => 'Tim IT',
+            'jumlah_roles' => 1,
+            'nama_roles' => 'Admin',
+            'mekanisme_account' => 'Manual',
+            'mekanisme_kredensial' => 'Password',
+            'fitur_reset_password' => true,
+            'pic_pengelola' => 'Admin Test',
+            'keterangan_tambahan' => '-',
+            'balasan_admin' => 'Sudah diperiksa',
+            'status' => 'selesai',
+            'file_hasil_itsa' => null,
+        ]);
     }
 }
