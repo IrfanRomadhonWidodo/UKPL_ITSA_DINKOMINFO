@@ -81,7 +81,7 @@ class DatabaseSeeder extends Seeder
             FormulirSeeder::class,
             FeedbackSeeder::class,
             HasilSeeder::class,
-            // NotifikasiSeeder::class, // Disabled - depends on data
+            NotifikasiSeeder::class,
         ]);
 
     }

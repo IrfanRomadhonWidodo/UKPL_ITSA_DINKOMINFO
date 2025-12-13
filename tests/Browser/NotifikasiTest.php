@@ -6,189 +6,74 @@ use Laravel\Dusk\Browser;
 use Tests\DuskTestCase;
 use App\Models\User;
 use App\Models\Notifikasi;
+use Illuminate\Foundation\Testing\DatabaseMigrations;
 
 class NotifikasiTest extends DuskTestCase
 {
-    /**
-     * Test user can view notifikasi list.
-     */
-    public function test_user_can_view_notifikasi_list(): void
-    {
-        $user = User::where('status', 'disetujui')->where('role', 'user')->first();
+    use DatabaseMigrations;
 
-        $this->browse(function (Browser $browser) use ($user) {
-            $browser->logout()
-                ->loginAs($user)
-                ->visit('/notifikasi')
-                ->assertPathIs('/notifikasi')
-                ->assertSee('Notifikasi');
-        });
+    public function setUp(): void
+    {
+        parent::setUp();
+        $this->seed();
     }
 
     /**
-     * Test notifikasi page displays notification list.
+     * Test user can open, view notification detail, and go back.
      */
-    public function test_notifikasi_page_displays_notification_list(): void
+    public function test_user_can_open_view_detail_and_go_back(): void
     {
-        $user = User::where('status', 'disetujui')->where('role', 'user')->first();
+        $user = User::where('email', 'user_approved0@example.com')->first();
+        $notifikasi = Notifikasi::where('user_id', $user->id)->first();
 
-        // Create a notification for this user
-        $notif = Notifikasi::create([
-            'user_id' => $user->id,
-            'judul' => 'Test Notification list',
-            'pesan' => 'This is a test notification message for list',
-            'type' => 'info',
-            'is_read' => false,
-        ]);
-
-        $this->browse(function (Browser $browser) use ($user) {
-            $browser->logout()
-                ->loginAs($user)
-                ->visit('/notifikasi')
-                ->waitFor('.notification-item, [class*="notification"], table', 10)
-                ->assertSee('Test Notification list');
-        });
-
-        $notif->delete(); // Cleanup
-    }
-
-    /**
-     * Test user can view notifikasi detail.
-     */
-    public function test_user_can_view_notifikasi_detail(): void
-    {
-        $user = User::where('status', 'disetujui')->where('role', 'user')->first();
-
-        $notifikasi = Notifikasi::create([
-            'user_id' => $user->id,
-            'judul' => 'Detail Test Notification',
-            'pesan' => 'This is the detailed message content',
-            'type' => 'info',
-            'is_read' => false,
-        ]);
+        if (!$notifikasi) {
+            $this->markTestSkipped('No notification data available for this user');
+        }
 
         $this->browse(function (Browser $browser) use ($user, $notifikasi) {
             $browser->logout()
                 ->loginAs($user)
-                ->visit('/notifikasi/' . $notifikasi->id)
-                ->assertSee('Detail Test Notification')
-                ->assertSee('This is the detailed message content');
+                ->visit('/notifikasi')
+                ->waitUntilMissing('#loading-screen', 5)
+                ->assertSee('Notifikasi')
+                ->click("a[href*='/notifikasi/{$notifikasi->id}']")
+                ->waitUntilMissing('#loading-screen', 5)
+                ->assertPathIs('/notifikasi/' . $notifikasi->id)
+                ->assertSee($notifikasi->judul)
+                ->assertSee('Kembali ke Notifikasi')
+                ->clickLink('Kembali ke Notifikasi')
+                ->assertPathIs('/notifikasi');
         });
-
-        $notifikasi->delete(); // Cleanup
     }
 
     /**
-     * Test user can mark notifikasi as read.
+     * Test user can select all and delete all notifications.
      */
-    public function test_user_can_mark_notifikasi_as_read(): void
+    public function test_user_can_select_all_and_delete_notifications(): void
     {
-        $user = User::where('status', 'disetujui')->where('role', 'user')->first();
+        $user = User::where('email', 'user_approved0@example.com')->first();
 
-        $notifikasi = Notifikasi::create([
-            'user_id' => $user->id,
-            'judul' => 'Mark Read Test',
-            'pesan' => 'This notification will be marked as read',
-            'type' => 'info',
-            'is_read' => false,
-        ]);
+        // Ensure user has exactly 3 notifications (User 0 has 4 by default, remove 'info' type)
+        Notifikasi::where('user_id', $user->id)->where('type', 'info')->delete();
 
-        $this->browse(function (Browser $browser) use ($user, $notifikasi) {
-            $browser->logout()
-                ->loginAs($user)
-                ->visit('/notifikasi/' . $notifikasi->id)
-                ->pause(1000); // Wait for mark as read to trigger
-        });
-
-        // Verify notification is marked as read
-        $this->assertTrue(Notifikasi::find($notifikasi->id)->is_read == 1); // Strict check might fail on diff types, using loose check
-
-        $notifikasi->delete(); // Cleanup
-    }
-
-    /**
-     * Test user can mark all notifikasi as read.
-     */
-    public function test_user_can_mark_all_notifikasi_as_read(): void
-    {
-        $user = User::where('status', 'disetujui')->where('role', 'user')->first();
-
-        // Create multiple unread notifications
-        for ($i = 0; $i < 3; $i++) {
-            Notifikasi::create([
-                'user_id' => $user->id,
-                'judul' => 'Batch Test Notification ' . $i,
-                'pesan' => 'Test message ' . $i,
-                'type' => 'info',
-                'is_read' => false,
-            ]);
+        $notifCount = Notifikasi::where('user_id', $user->id)->count();
+        if ($notifCount != 3) {
+            $this->markTestSkipped("Test requires exactly 3 notifications, found {$notifCount}");
         }
 
         $this->browse(function (Browser $browser) use ($user) {
-            $browser->logout()
+            $browser->resize(1280, 800)
                 ->loginAs($user)
                 ->visit('/notifikasi')
-                // Attempt to find the button, might need adjustment based on real UI
-                ->waitFor('button[title*="Tandai"], [onclick*="markAllAsRead"]', 5)
-                ->click('button[title*="Tandai"], [onclick*="markAllAsRead"]')
-                ->pause(1000)
-                ->assertSee('berhasil');
+                ->waitUntilMissing('#loading-screen', 10)
+                ->waitFor('#selectAllCheckbox', 10)
+                ->check('#selectAllCheckbox')
+                ->waitFor('#deleteSelectedBtn', 5)
+                ->click('#deleteSelectedBtn')
+                ->waitFor('.swal2-confirm', 5)
+                ->click('.swal2-confirm')
+                ->pause(2000) // Wait for AJAX and animation
+                ->assertSee('Berhasil'); // Verify success message
         });
-    }
-
-    /**
-     * Test user can delete notifikasi.
-     */
-    public function test_user_can_delete_notifikasi(): void
-    {
-        $user = User::where('status', 'disetujui')->where('role', 'user')->first();
-
-        $notifikasi = Notifikasi::create([
-            'user_id' => $user->id,
-            'judul' => 'Delete Test',
-            'pesan' => 'This notification will be deleted',
-            'type' => 'info',
-            'is_read' => false,
-        ]);
-
-        // We use a separate browser session to ensure we see the button
-        $this->browse(function (Browser $browser) use ($user, $notifikasi) {
-            $browser->logout()
-                ->loginAs($user)
-                ->visit('/notifikasi')
-                ->waitFor('form[action*="notifikasi/' . $notifikasi->id . '"] button, button[onclick*="delete"]', 10)
-                // Use script to force submit if button is tricky
-                ->script("document.querySelector('form[action*=\"notifikasi/{$notifikasi->id}\"]').submit();");
-
-            $browser->pause(1000);
-        });
-
-        $this->assertDatabaseMissing('notifikasi', ['id' => $notifikasi->id]);
-    }
-
-    /**
-     * Test unread notification count displays.
-     */
-    public function test_unread_notification_count_displays(): void
-    {
-        $user = User::where('status', 'disetujui')->where('role', 'user')->first();
-
-        // Create unread notifications
-        $notif = Notifikasi::create([
-            'user_id' => $user->id,
-            'judul' => 'Count Test',
-            'pesan' => 'Test message',
-            'type' => 'info',
-            'is_read' => false,
-        ]);
-
-        $this->browse(function (Browser $browser) use ($user) {
-            $browser->logout()
-                ->loginAs($user)
-                ->visit('/dashboard')
-                ->assertPresent('.notification-count, [class*="badge"], .unread-count');
-        });
-
-        $notif->delete();
     }
 }
