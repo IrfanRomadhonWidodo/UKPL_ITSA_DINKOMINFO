@@ -6,8 +6,17 @@ use Laravel\Dusk\Browser;
 use Tests\DuskTestCase;
 use App\Models\User;
 
+use Illuminate\Foundation\Testing\DatabaseMigrations;
+
 class AuthenticationTest extends DuskTestCase
 {
+    use DatabaseMigrations;
+
+    public function setUp(): void
+    {
+        parent::setUp();
+        $this->seed();
+    }
     /**
      * Test login page displays correctly.
      */
